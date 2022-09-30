@@ -9,6 +9,7 @@ namespace Unity.Robotics.UrdfImporter.Control{
         private static int prismaticJointVariable = 3;
         private static int revoluteJointVariable = 2;
         public List<float[]> dh;
+        public bool modifiedDH;
         public List<ArticulationBody> jointChain;
         public List<float> currentAngles;
 
@@ -33,11 +34,10 @@ namespace Unity.Robotics.UrdfImporter.Control{
             {
                 return;
             }
-
             foreach (ArticulationBody joint in robot.GetComponentsInChildren<ArticulationBody>())
             {
                 if (joint.jointType != ArticulationJointType.FixedJoint)
-                    jointChain.Add(joint);
+                    jointChain.Add(joint);                    
             }
         }
 
@@ -85,10 +85,15 @@ namespace Unity.Robotics.UrdfImporter.Control{
             endEffectorPosition = Matrix4x4.identity;
             for (int i = 0; i < dh.Count; i++)
             {
-                Matrix4x4 temp = FWDMatrix2(dh[i]).transpose;
-                endEffectorPosition = endEffectorPosition * (FWDMatrix2(dh[i]).transpose);
+                if (modifiedDH)
+                {
+                    endEffectorPosition = endEffectorPosition * (ModifiedDH_FWDMatrix(dh[i]).transpose);
+                }
+                else
+                {
+                    endEffectorPosition = endEffectorPosition * (ClassicDH_FWDMatrix(dh[i]).transpose);
+                }
             }
-
             return endEffectorPosition;
         
         }
@@ -101,20 +106,10 @@ namespace Unity.Robotics.UrdfImporter.Control{
         /// <param name="angles">List of float numbers representing joint poistions of a robot in meters or radians</param>
         public void PopulateDHparameters(List<float> angles)
         {
-            for (int i = 0; i < jointChain.Count; i++)
+
+            for (int i = 0; i < angles.Count; i++)
             {
-                if (jointChain[i].jointType == ArticulationJointType.RevoluteJoint)
-                {
-                    dh[i][revoluteJointVariable] = jointChain[i].jointPosition[0];
-                }
-                else if (jointChain[i].jointType == ArticulationJointType.PrismaticJoint)
-                {
-                    dh[i][prismaticJointVariable] = jointChain[i].jointPosition[3];
-                }
-                else
-                {
-                    Debug.LogError("Other joint types not supported");
-                }
+                dh[i][2] = angles[i]; 
             }
 
 
@@ -137,7 +132,7 @@ namespace Unity.Robotics.UrdfImporter.Control{
         /// </summary>
         /// <param name="DHparameters">Array of four float parameters</param>
         /// <returns></returns>
-        private Matrix4x4 FWDMatrix(float[] DHparameters) 
+        private Matrix4x4 ModifiedDH_FWDMatrix(float[] DHparameters) 
         {
             return new Matrix4x4(new Vector4(Mathf.Cos(DHparameters[2]),-Mathf.Sin(DHparameters[2]),0,DHparameters[1]),
                                 new Vector4(Mathf.Sin(DHparameters[2]) * Mathf.Cos(DHparameters[0]),Mathf.Cos(DHparameters[2]) * Mathf.Cos(DHparameters[0]),-Mathf.Sin(DHparameters[0]),-Mathf.Sin(DHparameters[0]) * DHparameters[3]),
@@ -151,7 +146,7 @@ namespace Unity.Robotics.UrdfImporter.Control{
         /// </summary>
         /// <param name="DHparameters">Array of four float parameters</param>
         /// <returns></returns>
-        private Matrix4x4 FWDMatrix2(float[] DHparameters) 
+        private Matrix4x4 ClassicDH_FWDMatrix(float[] DHparameters) 
         {
             return new Matrix4x4(new Vector4(Mathf.Cos(DHparameters[2]), -Mathf.Sin(DHparameters[2]) * Mathf.Cos(DHparameters[0]), Mathf.Sin(DHparameters[2]) * Mathf.Sin(DHparameters[0]), DHparameters[1] * Mathf.Cos(DHparameters[2])),
                                 new Vector4(Mathf.Sin(DHparameters[2]) , Mathf.Cos(DHparameters[2]) * Mathf.Cos(DHparameters[0]), -Mathf.Sin(DHparameters[0]) * Mathf.Cos(DHparameters[2]), Mathf.Sin(DHparameters[2]) * DHparameters[1]),
